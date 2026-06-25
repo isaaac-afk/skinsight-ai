@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SkinSight — lesion classifier with explainability</title>
+<style>
+  :root {
+    --ground: #0e1419;
+    --panel: #161e26;
+    --panel-edge: #243039;
+    --ink: #e8eef2;
+    --ink-dim: #8a9aa6;
+    --ink-faint: #56656f;
+    --signal: #3fd0d4;        /* clinical cyan */
+    --signal-deep: #1b8a8e;
+    --caution: #e8a13a;       /* amber: low-trust warning */
+    --alert: #e0566b;
+    --grid: rgba(63, 208, 212, 0.06);
+    --mono: "JetBrains Mono", "SF Mono", "Consolas", monospace;
+    --sans: "Inter", -apple-system, system-ui, sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--sans);
+    background: var(--ground);
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 32px 32px;
+    color: var(--ink);
+    line-height: 1.5;
+    min-height: 100vh;
+    padding: 32px 20px 80px;
+  }
+
+  .wrap { max-width: 980px; margin: 0 auto; }
+
+  /* ---- header ---- */
+  header { margin-bottom: 36px; border-bottom: 1px solid var(--panel-edge); padding-bottom: 24px; }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--signal);
+    margin-bottom: 14px;
+  }
+  h1 {
+    font-size: clamp(28px, 5vw, 44px);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.05;
+  }
+  h1 .thin { color: var(--ink-dim); font-weight: 300; }
+  .sub { color: var(--ink-dim); margin-top: 12px; max-width: 60ch; font-size: 15px; }
+
+  /* ---- uploader ---- */
+  .stage {
+    border: 1px dashed var(--panel-edge);
+    border-radius: 4px;
+    background: var(--panel);
+    padding: 48px 24px;
+    text-align: center;
+    transition: border-color 0.2s, background 0.2s;
+    cursor: pointer;
+  }
+  .stage.drag { border-color: var(--signal); background: #18242c; }
+  .stage .ring {
+    width: 56px; height: 56px; margin: 0 auto 18px;
+    border: 1.5px solid var(--signal-deep); border-radius: 50%;
+    display: grid; place-items: center;
+    color: var(--signal); font-size: 22px;
+  }
+  .stage h2 { font-size: 17px; font-weight: 600; margin-bottom: 6px; }
+  .stage p { color: var(--ink-faint); font-size: 13px; font-family: var(--mono); }
+  #file { display: none; }
+
+  /* ---- results ---- */
+  .results { margin-top: 32px; display: none; }
+  .results.show { display: block; animation: rise 0.5s ease both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+
+  .imaging {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 2px;
+    background: var(--panel-edge); border: 1px solid var(--panel-edge);
+    border-radius: 4px; overflow: hidden; margin-bottom: 2px;
+  }
+  .frame { background: var(--panel); position: relative; }
+  .frame img { width: 100%; display: block; aspect-ratio: 1; object-fit: cover; }
+  .frame .tag {
+    position: absolute; top: 10px; left: 10px;
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--ink);
+    background: rgba(14, 20, 25, 0.78); padding: 4px 9px; border-radius: 2px;
+    backdrop-filter: blur(4px);
+  }
+  .frame .tag.heat { color: var(--signal); }
+
+  /* trust meter */
+  .meter {
+    background: var(--panel); border: 1px solid var(--panel-edge);
+    border-top: none; padding: 20px 22px; border-radius: 0 0 4px 4px;
+    display: flex; align-items: center; gap: 22px; flex-wrap: wrap;
+  }
+  .meter .label { font-family: var(--mono); font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-dim); }
+  .bar-track { flex: 1; min-width: 180px; height: 6px; background: #0a0f13; border-radius: 3px; overflow: hidden; }
+  .bar-fill { height: 100%; width: 0; border-radius: 3px; transition: width 0.8s cubic-bezier(.2,.7,.3,1); }
+  .meter .pct { font-family: var(--mono); font-size: 20px; font-weight: 500; min-width: 56px; text-align: right; }
+
+  .verdict {
+    margin: 22px 0; padding: 18px 20px; border-radius: 4px;
+    border-left: 3px solid var(--signal); background: var(--panel);
+    display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap;
+  }
+  .verdict .lead { font-family: var(--mono); font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-dim); }
+  .verdict .name { font-size: 24px; font-weight: 700; letter-spacing: -0.01em; }
+  .verdict .code { font-family: var(--mono); color: var(--ink-faint); font-size: 13px; }
+
+  /* prediction bars */
+  .preds { background: var(--panel); border: 1px solid var(--panel-edge); border-radius: 4px; padding: 8px 0; }
+  .row { display: grid; grid-template-columns: 200px 1fr 60px; align-items: center; gap: 14px; padding: 9px 22px; }
+  .row .nm { font-size: 14px; }
+  .row .nm small { font-family: var(--mono); color: var(--ink-faint); font-size: 11px; display: block; }
+  .row .track { height: 4px; background: #0a0f13; border-radius: 2px; overflow: hidden; }
+  .row .fill { height: 100%; background: linear-gradient(90deg, var(--signal-deep), var(--signal)); border-radius: 2px; width: 0; transition: width 0.7s ease; }
+  .row .v { font-family: var(--mono); font-size: 13px; text-align: right; color: var(--ink-dim); }
+  .row.top .nm { font-weight: 600; }
+  .row.top .v { color: var(--signal); }
+
+  .note {
+    margin-top: 22px; font-size: 12.5px; color: var(--ink-faint);
+    border: 1px solid var(--panel-edge); border-radius: 4px; padding: 14px 16px;
+    background: rgba(224, 86, 107, 0.04);
+  }
+  .note b { color: var(--caution); font-weight: 600; }
+
+  .caution-banner {
+    display: none; margin: 22px 0; padding: 14px 18px; border-radius: 4px;
+    background: rgba(232, 161, 58, 0.08); border-left: 3px solid var(--caution);
+    color: var(--ink); font-size: 14px;
+  }
+  .caution-banner.show { display: block; }
+  .caution-banner b { color: var(--caution); }
+
+  .busy { display: none; text-align: center; padding: 40px; color: var(--signal); font-family: var(--mono); font-size: 13px; letter-spacing: 0.1em; }
+  .busy.show { display: block; }
+  .busy .dot { animation: blink 1.2s infinite; }
+  @keyframes blink { 0%,100%{opacity:.2} 50%{opacity:1} }
+
+  .reset { margin-top: 26px; background: none; border: 1px solid var(--panel-edge); color: var(--ink-dim); font-family: var(--mono); font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; padding: 10px 18px; border-radius: 3px; cursor: pointer; transition: all .2s; }
+  .reset:hover { border-color: var(--signal); color: var(--signal); }
+
+  @media (max-width: 620px) {
+    .imaging { grid-template-columns: 1fr; }
+    .row { grid-template-columns: 130px 1fr 50px; gap: 10px; padding: 9px 16px; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">ISIC-2019 · EfficientNet-B0 · Grad-CAM</div>
+    <h1>SkinSight <span class="thin">— what the model sees</span></h1>
+    <p class="sub">An educational lesion classifier that shows its work. Every prediction comes with a heatmap of where the network looked and a focus score telling you whether to trust it. Not a diagnosis.</p>
+  </header>
+
+  <label class="stage" id="stage">
+    <div class="ring">+</div>
+    <h2>Drop a dermatology image, or click to browse</h2>
+    <p>JPG / PNG · processed locally on your machine</p>
+    <input type="file" id="file" accept="image/*" />
+  </label>
+
+  <div class="busy" id="busy">analyzing<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></div>
+
+  <section class="results" id="results">
+    <div class="imaging">
+      <div class="frame"><span class="tag">Input</span><img id="imgOrig" alt="uploaded lesion" /></div>
+      <div class="frame"><span class="tag heat">Grad-CAM attention</span><img id="imgHeat" alt="attention heatmap" /></div>
+    </div>
+    <div class="meter">
+      <span class="label">Focus score</span>
+      <div class="bar-track"><div class="bar-fill" id="meterFill"></div></div>
+      <span class="pct" id="meterPct">—</span>
+    </div>
+
+    <div class="caution-banner" id="caution">
+      <b>Low focus.</b> The model's attention is spread across the frame rather than concentrated on a lesion. This often means the image is off-target or out-of-distribution — treat the prediction below as unreliable.
+    </div>
+
+    <div class="verdict">
+      <div>
+        <div class="lead">Most likely class</div>
+        <div class="name" id="topName">—</div>
+      </div>
+      <div class="code" id="topCode"></div>
+    </div>
+
+    <div class="preds" id="preds"></div>
+
+    <div class="note" id="note"></div>
+
+    <button class="reset" id="reset">Analyze another</button>
+  </section>
+</div>
+
+<script>
+  const stage = document.getElementById('stage');
+  const fileInput = document.getElementById('file');
+  const busy = document.getElementById('busy');
+  const results = document.getElementById('results');
+
+  ['dragenter','dragover'].forEach(e =>
+    stage.addEventListener(e, ev => { ev.preventDefault(); stage.classList.add('drag'); }));
+  ['dragleave','drop'].forEach(e =>
+    stage.addEventListener(e, ev => { ev.preventDefault(); stage.classList.remove('drag'); }));
+  stage.addEventListener('drop', ev => {
+    const f = ev.dataTransfer.files[0];
+    if (f) analyze(f);
+  });
+  fileInput.addEventListener('change', () => { if (fileInput.files[0]) analyze(fileInput.files[0]); });
+
+  document.getElementById('reset').addEventListener('click', () => {
+    results.classList.remove('show');
+    fileInput.value = '';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
+  function colorFor(score) {
+    if (score >= 0.45) return getCSS('--signal');
+    if (score >= 0.25) return getCSS('--caution');
+    return getCSS('--alert');
+  }
+  function getCSS(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+
+  async function analyze(file) {
+    results.classList.remove('show');
+    busy.classList.add('show');
+
+    const fd = new FormData();
+    fd.append('image', file);
+
+    try {
+      const res = await fetch('/api/analyze', { method: 'POST', body: fd });
+      const data = await res.json();
+      busy.classList.remove('show');
+      if (!res.ok) { alert(data.error || 'Something went wrong.'); return; }
+      render(data);
+    } catch (err) {
+      busy.classList.remove('show');
+      alert('Could not reach the server. Is app.py running?');
+    }
+  }
+
+  function render(d) {
+    document.getElementById('imgOrig').src = d.original;
+    document.getElementById('imgHeat').src = d.overlay;
+
+    const pct = Math.round(d.focus_score * 100);
+    const fill = document.getElementById('meterFill');
+    const col = colorFor(d.focus_score);
+    fill.style.background = col;
+    document.getElementById('meterPct').textContent = pct + '%';
+    document.getElementById('meterPct').style.color = col;
+
+    document.getElementById('topName').textContent = d.top.name;
+    document.getElementById('topCode').textContent = '[' + d.top.code + ']';
+
+    document.getElementById('caution').classList.toggle('show', d.focus_score < 0.25);
+
+    const preds = document.getElementById('preds');
+    preds.innerHTML = '';
+    d.predictions.forEach((p, i) => {
+      const row = document.createElement('div');
+      row.className = 'row' + (i === 0 ? ' top' : '');
+      row.innerHTML =
+        '<div class="nm">' + p.name + '<small>' + p.code + '</small></div>' +
+        '<div class="track"><div class="fill" style="width:0"></div></div>' +
+        '<div class="v">' + (p.confidence * 100).toFixed(1) + '%</div>';
+      preds.appendChild(row);
+    });
+
+    document.getElementById('note').innerHTML =
+      '<b>Educational use only — not a medical diagnosis.</b> ' +
+      'The heatmap shows where the model focused; if it is not on the lesion, ' +
+      'treat the result as unreliable. Consult a dermatologist for any skin concern.';
+
+    results.classList.add('show');
+
+    // animate after layout
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        fill.style.width = pct + '%';
+        document.querySelectorAll('.row .fill').forEach((el, i) => {
+          el.style.width = (d.predictions[i].confidence * 100) + '%';
+        });
+      }, 60);
+    });
+  }
+</script>
+</body>
+</html>

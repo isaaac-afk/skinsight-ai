@@ -1,0 +1,6 @@
+openai-whisper
+pyaudio
+numpy
+keyboard
+pyperclip
+pyautogui

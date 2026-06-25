@@ -1,0 +1,11 @@
+data/
+*.pt
+venv/
+.venv/
+__pycache__/
+*.pyc
+gradcam_overlay.png
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
