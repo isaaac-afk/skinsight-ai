@@ -1,111 +1,55 @@
-# VoiceDrop
+﻿# SkinSight AI
 
-A free, offline voice dictation tool for Windows. Press a hotkey, speak, and your words appear in any text field — browser, Word, email, or any application. No subscriptions, no cloud processing, and no data leaves your machine.
+An educational dermatology image classifier that **shows its work**. It predicts a lesion class from the ISIC 2019 taxonomy and, for every prediction, renders a Grad-CAM heatmap of where the network looked plus a focus score indicating whether that attention is concentrated enough to trust.
 
-Built as a free alternative to Wispr Flow using OpenAI's Whisper model running fully locally.
+> **Not a medical device.** Outputs are informational classifications for learning and demonstration, not diagnoses. Always consult a dermatologist for any skin concern.
 
-## Features
+## Why this exists
 
-- **Fully offline** — audio is processed locally and never leaves your computer
-- **System-wide compatibility** — works in browsers, documents, messaging apps, or any text field
-- **Auto-stop on silence** — pauses for 1.5 seconds and transcribes automatically
-- **Hallucination filtering** — filters out common Whisper artifacts produced on silence or background noise
-- **Clipboard-safe** — preserves the original clipboard contents after pasting
-- **Zero cost** — no API keys, no subscriptions, no usage limits
+Most "skin cancer classifier" projects report a single accuracy number and stop there. That number hides the failure mode that matters: a confident prediction made for the wrong reasons - keying off a ruler marking, hair, or background skin instead of the lesion. This project treats **trustworthiness as a first-class output**, not an afterthought. The model is paired with an explainability layer so a human can see *what* drove each prediction and decide whether to believe it.
 
-## Demo
+## What it does
 
-```
-========================================================
-  VoiceDrop - Offline Voice Dictation
-========================================================
-  Model loaded!
-  Press SHIFT+SPACE to START. Press again to STOP.
-  Auto-stop after 1.5s of silence.
-========================================================
-  >>> Recording...
-  Auto-stopped (silence detected)
-  Transcribing...
-  Done: 'Hey, this is a test of my voice dictation tool.'
-```
+- Classifies a lesion image across the 8 ISIC 2019 diagnostic categories (melanoma, melanocytic nevus, basal cell carcinoma, actinic keratosis, benign keratosis, dermatofibroma, vascular lesion, squamous cell carcinoma).
+- Generates a **Grad-CAM** heatmap over the input showing the regions that most influenced the top prediction.
+- Computes a **focus score** - a heuristic measuring how concentrated the model''s attention is. Diffuse attention (often a sign the image is off-target or out-of-distribution) triggers a visible low-trust warning.
+- Serves all of this through a Flask API and a single-page web demo.
 
-## Setup
+## Approach
 
-### 1. Install Python dependencies
+- **Transfer learning** on EfficientNet-B0 (pretrained on ImageNet) rather than a from-scratch CNN - far stronger on a dataset this size while staying lightweight.
+- **Class imbalance handled twice**: ISIC is dominated by benign nevi, so training uses both a weighted random sampler and a class-weighted loss. Model selection is on **macro-AUC**, not accuracy.
+- **Grad-CAM** hooks the final convolutional layer to weight activation maps by their gradients, producing a class-discriminative heatmap.
 
-```bash
-pip install -r requirements.txt
-```
+## Results
 
-### 2. Install ffmpeg
+On a balanced subset (~1,500 images/class, 20% held out for validation), the model reaches a macro-AUC in the ~0.94 range - comparable to published ISIC baselines for this backbone.
 
-```bash
-winget install ffmpeg
-```
+## Honest limitations
 
-### 3. Run
+- The **focus score is a crude entropy heuristic**. It reliably flags genuinely off-target images, but it under-scores legitimate lesions that fill most of the frame. A size-normalized metric would behave more intuitively - a planned improvement.
+- Trained on a subset, not the full archive, for tractable CPU training.
+- ISIC''s dermoscopic images differ from consumer phone photos and skew toward lighter skin tones; this model would not generalize reliably to either, which is one reason the project is framed as educational rather than diagnostic.
 
-```bash
-set KMP_DUPLICATE_LIB_OK=TRUE
-python dictate.py
-```
+## Stack
 
-**Note:** Run Command Prompt as Administrator so the global hotkey can be registered system-wide.
+Python, PyTorch, timm (EfficientNet-B0), Flask, vanilla JS/HTML front-end
 
-The first run will download the Whisper model (~140MB for `base`). This is a one-time download.
+## Running it
 
-## Usage
+    pip install -r requirements.txt
 
-1. Click into any text field
-2. Press **Shift + Space**
-3. Speak naturally
-4. Pause for 1.5 seconds (or press the hotkey again) and the text appears at your cursor
+    # 1. Prepare data (download ISIC 2019 Training Input + GroundTruth CSV into data/):
+    python prepare_isic2019.py --csv data/ISIC_2019_Training_GroundTruth.csv --images data/ISIC_2019_Training_Input --out data/isic --per-class 1500
 
-Close the application window or press **Esc** in the terminal to quit.
+    # 2. Train (saves skinsight_efficientnet_b0.pt on best validation macro-AUC):
+    python skinsight_model.py
 
-## Configuration
+    # 3. Run the demo, then open http://127.0.0.1:5000
+    python app.py
 
-Edit the top of `dictate.py` to customize behavior:
+The ISIC 2019 dataset (CC-BY-NC) is not included in this repo and must be downloaded separately from the ISIC Challenge archive (https://challenge.isic-archive.com/).
 
-| Setting | Description | Default |
-|---|---|---|
-| `WHISPER_MODEL` | `tiny`, `base`, `small`, `medium`, `large` | `base` |
-| `SILENCE_LIMIT` | Seconds of silence before auto-stop | `1.5` |
-| `MAX_DURATION` | Hard cap on recording length (seconds) | `60.0` |
-| `HOTKEY` | Global keyboard shortcut | `shift+space` |
+## License / data note
 
-### Model selection
-
-| Model | Size | Speed | Accuracy |
-|---|---|---|---|
-| tiny | 75MB | Fastest | Adequate |
-| base | 140MB | Fast | Recommended |
-| small | 460MB | Medium | Better |
-| medium | 1.5GB | Slow | Great |
-| large | 3GB | Slowest | Best |
-
-## How It Works
-
-1. PyAudio captures microphone input in real time
-2. RMS energy detection identifies silence and triggers auto-stop
-3. The audio buffer is written to a temporary WAV file
-4. OpenAI Whisper transcribes the file locally
-5. A hallucination filter removes common artifacts produced on silence
-6. PyAutoGUI pastes the result into the currently focused window
-
-## Tech Stack
-
-- **OpenAI Whisper** — speech-to-text inference
-- **PyAudio** — microphone input capture
-- **NumPy** — real-time audio signal analysis
-- **keyboard** — global hotkey registration
-- **Tkinter** — minimal status indicator overlay
-- **pyperclip + pyautogui** — clipboard-based text injection
-
-## License
-
-MIT
-
-## Author
-
-Built by Isaac as an open-source alternative to paid dictation tools.
+Code is provided for educational use. The ISIC 2019 data is licensed CC-BY-NC (non-commercial); it is not redistributed here.
