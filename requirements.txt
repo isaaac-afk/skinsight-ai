@@ -1,6 +1,8 @@
-openai-whisper
-pyaudio
-numpy
-keyboard
-pyperclip
-pyautogui
+torch>=2.0
+torchvision>=0.15
+timm>=0.9
+flask>=3.0
+pillow>=10.0
+numpy>=1.24
+matplotlib>=3.7
+scikit-learn>=1.3
