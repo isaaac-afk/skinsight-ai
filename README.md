@@ -12,7 +12,7 @@ Most "skin cancer classifier" projects report a single accuracy number and stop 
 
 - Classifies a lesion image across the 8 ISIC 2019 diagnostic categories (melanoma, melanocytic nevus, basal cell carcinoma, actinic keratosis, benign keratosis, dermatofibroma, vascular lesion, squamous cell carcinoma).
 - Generates a **Grad-CAM** heatmap over the input showing the regions that most influenced the top prediction.
-- Computes a **focus score** - a heuristic measuring how concentrated the model''s attention is. Diffuse attention (often a sign the image is off-target or out-of-distribution) triggers a visible low-trust warning.
+- Computes a focus score a heuristic measuring how concentrated the model''s attention is. Diffuse attention (often a sign the image is off-target or out-of-distribution) triggers a visible low-trust warning.
 - Serves all of this through a Flask API and a single-page web demo.
 
 ## Approach
