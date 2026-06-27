@@ -1,8 +1,8 @@
 ﻿# SkinSight AI
 
-An educational dermatology image classifier that **shows its work**. It predicts a lesion class from the ISIC 2019 taxonomy and, for every prediction, renders a Grad-CAM heatmap of where the network looked plus a focus score indicating whether that attention is concentrated enough to trust.
+An educational dermatology image classifier that shows its work. It predicts a lesion class from the ISIC 2019 taxonomy and, for every prediction, renders a Grad-CAM heatmap of where the network looked plus a focus score indicating whether that attention is concentrated enough to trust.
 
-> **Not a medical device.** Outputs are informational classifications for learning and demonstration, not diagnoses. Always consult a dermatologist for any skin concern.
+> Not a medical device. Outputs are informational classifications for learning and demonstration, not diagnoses. Always consult a dermatologist for any skin concern.
 
 ## Why this exists
 
