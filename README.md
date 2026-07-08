@@ -16,7 +16,6 @@ Most "skin cancer classifier" projects report a single accuracy number and stop 
 - Serves all of this through a Flask API and a single-page web demo.
 
 ## Approach
-
 - **Transfer learning** on EfficientNet-B0 (pretrained on ImageNet) rather than a from-scratch CNN - far stronger on a dataset this size while staying lightweight.
 - **Class imbalance handled twice**: ISIC is dominated by benign nevi, so training uses both a weighted random sampler and a class-weighted loss. Model selection is on **macro-AUC**, not accuracy.
 - **Grad-CAM** hooks the final convolutional layer to weight activation maps by their gradients, producing a class-discriminative heatmap.
