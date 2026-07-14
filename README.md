@@ -8,7 +8,6 @@ An educational dermatology image classifier that shows its work. It predicts a l
 Most "skin cancer classifier" projects report a single accuracy number and stop there. That number hides the failure mode that matters: a confident prediction made for the wrong reasons - keying off a ruler marking, hair, or background skin instead of the lesion. This project treats **trustworthiness as a first-class output**, not an afterthought. The model is paired with an explainability layer so a human can see *what* drove each prediction and decide whether to believe it.
 
 ## What it does
-
 - Classifies a lesion image across the 8 ISIC 2019 diagnostic categories (melanoma, melanocytic nevus, basal cell carcinoma, actinic keratosis, benign keratosis, dermatofibroma, vascular lesion, squamous cell carcinoma).
 - Generates a **Grad-CAM** heatmap over the input showing the regions that most influenced the top prediction.
 - Computes a focus score a heuristic measuring how concentrated the model''s attention is. Diffuse attention (often a sign the image is off-target or out-of-distribution) triggers a visible low-trust warning.
