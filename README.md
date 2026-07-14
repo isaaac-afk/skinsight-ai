@@ -4,7 +4,6 @@ An educational dermatology image classifier that shows its work. It predicts a l
 > Not a medical device. Outputs are informational classifications for learning and demonstration, not diagnoses. Always consult a dermatologist for any skin concern.
 
 ## Why this exists
-
 Most "skin cancer classifier" projects report a single accuracy number and stop there. That number hides the failure mode that matters: a confident prediction made for the wrong reasons - keying off a ruler marking, hair, or background skin instead of the lesion. This project treats **trustworthiness as a first-class output**, not an afterthought. The model is paired with an explainability layer so a human can see *what* drove each prediction and decide whether to believe it.
 
 ## What it does
